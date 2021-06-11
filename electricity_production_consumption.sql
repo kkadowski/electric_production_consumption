@@ -16,6 +16,7 @@ SELECT* FROM indicators i
 WHERE lower(indicatorname) LIKE '%electr%'
 ORDER BY indicatorname;
 
+
 --Indicators for production
 SELECT DISTINCT indicatorname, indicatorcode 
 FROM indicators i
@@ -163,7 +164,7 @@ SELECT Region,
 	ROUND(avg(consumption)::NUMERIC,1) avg_consumption
 FROM region_electr_consumption_pc
 GROUP BY Region
-ORDER BY 2;
+ORDER BY 2 DESC;
 
 
 --Average electr. consumption in coutries (per capita) by every 10 years 
@@ -179,7 +180,8 @@ AS
 	FROM indicators i
 	JOIN country c ON i.countrycode = c.countrycode
 	WHERE lower(i.indicatorname) LIKE '%electric power cons%' AND c.region<>'';
-SELECT * FROM ten_years;
+SELECT * 
+FROM ten_years;
 
 
 --Electr. consumption (per capita) by countries
@@ -195,7 +197,8 @@ AS
 	WHERE lower(i.indicatorname) LIKE '%electric power cons%' AND c.region<>''
 	GROUP BY country, yearof, consumption
 	ORDER BY 1, 2;
-SELECT * FROM consumption_by_countires_pc;
+SELECT * 
+FROM consumption_by_countires_pc;
 
 
 -- Percentage increases in consumption (per capita) by countries / years 
@@ -217,14 +220,14 @@ SELECT country,
 	yearof,
 	percent_consumption_incr
 FROM percent_increases_pc
-WHERE percent_consumption_incr = (SELECT max(percent_consumption_incr) FROM percent_increases);
+WHERE percent_consumption_incr = (SELECT max(percent_consumption_incr) FROM percent_increases_pc);
 
 -- Country with the largest negative consumption growth  (per capita)
 SELECT country,
 	yearof,
 	percent_consumption_incr
 FROM percent_increases_pc
-WHERE percent_consumption_incr = (SELECT min(percent_consumption_incr) FROM percent_increases);
+WHERE percent_consumption_incr = (SELECT min(percent_consumption_incr) FROM percent_increases_pc);
 
 	
 
@@ -253,7 +256,7 @@ AS
 	FROM percent_increases_pc o
 	CROSS JOIN percentyle_pc;
 SELECT * 
-FROM high;
+FROM high_pc;
 
 --Countries in 95% (per capita)
 SELECT o.country,
@@ -282,7 +285,8 @@ AS
 	WHERE lower(i.indicatorname) LIKE '%electric power cons%' AND c.region<>'' 
 	GROUP BY yearof, year_consum
 	ORDER BY 1;
-select * from year_consumption_world_pc;
+select * 
+FROM year_consumption_world_pc;
 
 
 DROP TABLE IF EXISTS avg_year_pc;
@@ -326,7 +330,7 @@ AS
 		i."Year", 
 		i.value, 
 		p.population
-	ORDER BY 2;
+	ORDER BY 5 DESC;
 
 SELECT * 
 FROM region_electr_consumption_tot;
@@ -336,7 +340,7 @@ SELECT Region,
 	ROUND(avg(consumption_tot)::NUMERIC,1) avg_consumption_tot
 FROM region_electr_consumption_tot
 GROUP BY Region
-ORDER BY 2;
+ORDER BY 2 DESC;
 
 
 --Electr. consumption (total) by countries
@@ -353,7 +357,8 @@ AS
 		AND p."Year" = i."Year" AND c.region<>''
 	GROUP BY country, yearof, i.value, consumption_tot, p.population
 	ORDER BY 1, 2;
-SELECT * FROM consumption_by_countires_tot;
+SELECT * 
+FROM consumption_by_countires_tot;
 
 DROP TABLE IF EXISTS incr_consump_tot;
 CREATE TEMP TABLE incr_consump_tot
@@ -424,14 +429,14 @@ AS
 SELECT * 
 FROM high_tot;
 
---Countries in 95% (per capita)
+--Countries in 95% (total)
 SELECT o.country,
 	   sum(o.in_q95) as sum_q95
 FROM high_tot o 
 GROUP BY o.country
 ORDER BY 2 DESC;
 
--- Countries in 5% (per capita)
+-- Countries in 5% (total)
 SELECT o.country,
 	   sum(in_q5) AS sum_q5
 FROM high_tot o 
@@ -477,7 +482,7 @@ AS
 SELECT * 
 FROM avg_year_tot;
 
--- The largest increases in average consumption globally (per capita)
+-- The largest increases in average consumption globally (total)
 SELECT yearof,
 		round((avg_year_consum_tot - avg_year_consum_prev_tot)/avg_year_consum_prev_tot,4)*100 as percet_avg_year_consum_tot
 FROM avg_year_tot
@@ -498,13 +503,13 @@ ORDER BY indicatorcode;
 
 SELECT i."Year" AS yearof, 
 	c.shortname AS country, 
-	i.indicatorname  Asindicator_name,
+	i.indicatorname  AS indicator_name,
 	i.indicatorcode AS icode,
-	sum(round(i.value::numeric, 1)) AS production 
+	avg(round(i.value::numeric, 1)) AS production 
 FROM indicators i
 JOIN country c ON i.countrycode = c.countrycode
 JOIN population p ON c.countrycode = p.countrycode
-WHERE lower(i.indicatorname) LIKE '%electricity prod%' AND p."Year" = i."Year" AND c.region<>''
+WHERE lower(i.indicatorname) LIKE '%electricity prod%' AND p."Year" = i."Year" AND c.region<>'' AND lower(i.indicatorcode) LIKE '%zs'
 GROUP BY  i."Year" , c.shortname, i.indicatorname, i.indicatorcode 
 ORDER BY (1,2); 
 
@@ -518,13 +523,14 @@ AS
 SELECT c.shortname AS country, 
 	i.indicatorname  AS indicator_name, 
 	i.indicatorcode As icode,
-	sum(round(i.value::numeric, 1)) production
+	round(i.value::numeric, 1) production
 FROM indicators i 
 JOIN country c ON i.countrycode = c.countrycode
 JOIN population p ON c.countrycode = p.countrycode
 WHERE lower(i.indicatorname) LIKE'%electricity prod%' AND lower(i.indicatorcode) LIKE'%zs' AND i.value <>0 AND p."Year" = i."Year" AND c.region<>''
-GROUP BY c.shortname, i.indicatorname, i.indicatorcode 
+GROUP BY c.shortname, i.indicatorname, i.indicatorcode,i.value
 ORDER BY (1,2); 
+
 
 SELECT country, 
 	icode, 
@@ -541,7 +547,7 @@ AS
 	FROM crosstab('
 		select country,
 		icode, 
-		sum(production) as sum_prod 
+		avg(production) as avg_prod 
 		from prod_temp 
 		group by country, icode
 		order by 1,2 ')
@@ -667,7 +673,7 @@ FROM avg_produc;
 SELECT yearof,
 	round((avg_year_produc - avg_year_produc_prev)/avg_year_produc_prev,4)*100 AS percent_avg_year_produc_incr
 FROM avg_produc
-ORDER BY 2 DESC;
+ORDER BY 2 ;
 
 -- ====================================================
 -- Production in Regions
@@ -678,12 +684,12 @@ AS
 SELECT c.shortname AS country, 
 	i.indicatorname  AS indicator_name, 
 	i.indicatorcode As icode,
-	sum(round(i.value::numeric, 1)) production
+	round(i.value::numeric, 1) production
 FROM indicators i 
 JOIN country c ON i.countrycode = c.countrycode
 JOIN population p ON c.countrycode = p.countrycode
 WHERE lower(i.indicatorname) LIKE'%electricity prod%' AND lower(i.indicatorcode) LIKE'%zs' AND i.value <>0 AND p."Year" = i."Year" AND c.region=''
-GROUP BY c.shortname, i.indicatorname, i.indicatorcode 
+GROUP BY c.shortname, i.indicatorname, i.indicatorcode, i.value 
 ORDER BY (1,2); 
 
 SELECT country, 
@@ -701,7 +707,7 @@ AS
 	FROM crosstab('
 		select country,
 		icode, 
-		sum(production) as sum_prod 
+		avg(production) as avg_prod 
 		from prod_temp_regions
 		group by country, icode
 		order by 1,2 ')
